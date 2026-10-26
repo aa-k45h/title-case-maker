@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Title Case Maker</title>
+  <meta name="description" content="Convert Markdown, HTML, and plain-text headings into proper Chicago or AP title case, right in your browser." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111827'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='15' fill='white' text-anchor='middle'%3EAa%3C/text%3E%3C/svg%3E" />
+
+  <style>
+    /* ======================================================================
+       COLOUR PALETTE
+       Every colour in the app comes from these variables. To apply a new
+       palette, change the values here (light theme first, dark theme below).
+       ====================================================================== */
+    :root {
+      --bg:            #f6f6f3;
+      --surface:       #ffffff;
+      --surface-2:     #f0f0ec;
+      --text:          #16181d;
+      --text-muted:    #6b6f78;
+      --border:        #e3e3dd;
+      --accent:        #2f5bea;   /* buttons, active states, focus rings */
+      --accent-hover:  #2448c4;
+      --accent-text:   #ffffff;   /* text on top of the accent colour */
+      --accent-soft:   #e7edfd;
+      --highlight:     #fff1b8;   /* changed words in the output */
+      --highlight-text:#4a3a00;
+      --success:       #1f8a4c;
+      --danger:        #c2412d;
+      --shadow:        0 1px 2px rgba(16,24,40,.04), 0 4px 16px rgba(16,24,40,.06);
+      --radius:        14px;
+      --font-ui:       "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono:     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color-scheme: light;
+    }
+    :root[data-theme="dark"] {
+      --bg:            #0f1115;
+      --surface:       #171a20;
+      --surface-2:     #1f232b;
+      --text:          #e8e9ec;
+      --text-muted:    #9298a3;
+      --border:        #2a2f38;
+      --accent:        #6d8cff;
+      --accent-hover:  #8aa2ff;
+      --accent-text:   #0b0d12;
+      --accent-soft:   #1e2640;
+      --highlight:     #4a3d0e;
+      --highlight-text:#ffe9a3;
+      --success:       #4cc282;
+      --danger:        #ef7a66;
+      --shadow:        0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      transition: background .2s ease, color .2s ease;
+    }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    svg.icon { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+
+    /* ---------- Header ---------- */
+    header.top {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      margin-bottom: 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .logo {
+      width: 44px; height: 44px; border-radius: 12px; flex: none;
+      background: var(--text); color: var(--bg);
+      display: grid; place-items: center; font-weight: 700; font-size: 17px; letter-spacing: -.02em;
+    }
+    .brand h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+    .brand p { margin: 2px 0 0; color: var(--text-muted); font-size: 14px; }
+
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 40px; min-width: 40px; padding: 0 12px; border-radius: 10px;
+      background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+      transition: background .15s, border-color .15s;
+    }
+    .icon-btn:hover { border-color: var(--text-muted); }
+    .theme-toggle .sun { display: none; }
+    :root[data-theme="dark"] .theme-toggle .sun { display: block; }
+    :root[data-theme="dark"] .theme-toggle .moon { display: none; }
+
+    /* ---------- Control bar ---------- */
+    .controls {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 16px;
+    }
+    .control { display: flex; align-items: center; gap: 10px; }
+    .control-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+
+    .segmented {
+      display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px;
+      background: var(--surface-2); border: 1px solid var(--border);
+    }
+    .segmented button {
+      border: 0; background: transparent; padding: 6px 12px; border-radius: 7px;
+      font-size: 13.5px; font-weight: 500; color: var(--text-muted); white-space: nowrap;
+      transition: background .15s, color .15s, box-shadow .15s;
+    }
+    .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .segmented button:hover:not([aria-pressed="true"]) { color: var(--text); }
+
+    select.select {
+      height: 34px; padding: 0 30px 0 10px; border-radius: 9px; border: 1px solid var(--border);
+      background: var(--surface-2); font-size: 13.5px; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+
+    .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-size: 13.5px; font-weight: 500; }
+    .switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .switch .track {
+      width: 36px; height: 20px; border-radius: 999px; background: var(--border); position: relative; transition: background .2s;
+    }
+    .switch .track::after {
+      content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s;
+    }
+    .switch input:checked + .track { background: var(--accent); }
+    .switch input:checked + .track::after { transform: translateX(16px); }
+    .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .controls .spacer { flex: 1; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px;
+      border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-text);
+      font-weight: 600; font-size: 14px; transition: background .15s, transform .05s;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:active { transform: translateY(1px); }
+    .kbd { font-family: var(--font-mono); font-size: 11px; opacity: .75; }
+
+    /* ---------- Panels ---------- */
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panel {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+    }
+    .panel-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--border);
+    }
+    .panel-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    .panel-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+      border-radius: 8px; border: 1px solid var(--border); background: var(--surface);
+      font-size: 13px; font-weight: 500; color: var(--text); transition: background .15s, border-color .15s;
+    }
+    .btn-ghost:hover { background: var(--surface-2); }
+    .btn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+
+    .tabs { display: flex; gap: 2px; }
+    .tabs button {
+      border: 0; background: transparent; padding: 6px 10px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 500; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;
+    }
+    .tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+    .tabs button:hover:not([aria-selected="true"]) { color: var(--text); }
+
+    .panel-body { position: relative; height: 520px; display: flex; }
+
+    /* Editor with line numbers */
+    .editor { display: flex; flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.65; }
+    .gutter {
+      flex: none; padding: 14px 10px 14px 14px; text-align: right; color: var(--text-muted); opacity: .6;
+      background: var(--surface-2); border-right: 1px solid var(--border); overflow: hidden; user-select: none;
+      white-space: pre; min-width: 46px;
+    }
+    textarea.input {
+      flex: 1; min-width: 0; resize: none; border: 0; outline: 0; padding: 14px 16px; margin: 0;
+      background: transparent; font: inherit; line-height: inherit; white-space: pre; overflow: auto; tab-size: 2;
+    }
+    textarea.input::placeholder { color: var(--text-muted); opacity: .8; }
+
+    /* Drop zone */
+    .dropzone {
+      flex: 1; margin: 16px; border: 2px dashed var(--border); border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      text-align: center; padding: 24px; color: var(--text-muted); transition: border-color .15s, background .15s;
+      cursor: pointer;
+    }
+    .dropzone.dragging { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .dropzone .big-icon { width: 40px; height: 40px; stroke-width: 1.5; }
+    .dropzone strong { color: var(--text); font-size: 15px; }
+    .file-chip {
+      display: none; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 10px; border-radius: 8px;
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-size: 13px;
+    }
+    .file-chip.show { display: inline-flex; }
+
+    /* Output */
+    .output {
+      flex: 1; min-width: 0; margin: 0; padding: 14px 16px; overflow: auto;
+      font-family: var(--font-mono); font-size: 13.5px; line-height: 1.65; white-space: pre-wrap;
+      overflow-wrap: anywhere; tab-size: 2;
+    }
+    .output mark { background: var(--highlight); color: var(--highlight-text); border-radius: 3px; padding: 0 1px; }
+    .output.no-marks mark { background: transparent; color: inherit; padding: 0; }
+    .empty-state {
+      position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; color: var(--text-muted); text-align: center; padding: 24px; pointer-events: none;
+    }
+    .empty-state .big-icon { width: 36px; height: 36px; stroke-width: 1.5; opacity: .7; }
+
+    .panel-foot {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+      padding: 9px 16px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-muted);
+    }
+    .stats { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+      background: var(--surface-2); border: 1px solid var(--border); font-size: 12px; color: var(--text-muted); white-space: nowrap;
+    }
+    .chip b { color: var(--text); font-weight: 600; }
+    .chip.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+    .chip.accent b { color: var(--accent); }
+
+    /* Toast */
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0;
+      background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px;
+      font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: var(--danger); color: #fff; }
+
+    footer.foot { margin-top: 20px; text-align: center; color: var(--text-muted); font-size: 12.5px; }
+    footer.foot button { background: none; border: 0; color: var(--accent); padding: 0; font-size: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Rules dialog */
+    dialog.rules {
+      border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text);
+      padding: 0; width: min(560px, calc(100% - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    }
+    dialog.rules::backdrop { background: rgba(0,0,0,.4); }
+    .rules-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .rules-head h2 { margin: 0; font-size: 16px; }
+    .rules-body { padding: 6px 18px 18px; max-height: 65vh; overflow: auto; font-size: 14px; }
+    .rules-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin: 16px 0 6px; }
+    .rules-body p { margin: 0; line-height: 1.7; }
+    .rules-body code { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 920px) {
+      .panels { grid-template-columns: 1fr; }
+      .panel-body { height: 380px; }
+      .controls .spacer { display: none; }
+    }
+    @media (max-width: 560px) {
+      .brand p { display: none; }
+      .control { flex-wrap: wrap; }
+      .btn-primary { width: 100%; justify-content: center; }
+      .btn-label { display: none; }
+    }
+  </style>
+
+  <!-- Apply saved theme before paint to avoid a flash -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('tcm-theme');
+        var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+    })();
+  </script>
+</head>
+<body>
+  <!-- Icon sprite (Lucide-style, inline so the page works offline) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+    <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z"/><path d="M14 2v6h6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="m15 4-1 1M21 10l-1 1M19 3l-1 1M15 9l-9.5 9.5a1.5 1.5 0 0 0 2 2L17 11M14 6l4 4"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </svg>
+
+  <div class="wrap">
+    <!-- Header -->
+    <header class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">Aa</div>
+        <div>
+          <h1>Title Case Maker</h1>
+          <p>Intelligent casing transformer for Markdown, HTML, and plain text</p>
+        </div>
+      </div>
+      <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">
+        <svg class="icon moon"><use href="#i-moon"/></svg>
+        <svg class="icon sun"><use href="#i-sun"/></svg>
+      </button>
+    </header>
+
+    <!-- Control bar -->
+    <section class="controls" aria-label="Conversion settings">
+      <div class="control">
+        <span class="control-label" id="scopeLabel">Scope</span>
+        <div class="segmented" role="group" aria-labelledby="scopeLabel" data-setting="scope">
+          <button type="button" data-value="headings" aria-pressed="true">Headings only (H1–H5)</button>
+          <button type="button" data-value="all" aria-pressed="false">All text</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <span class="control-label" id="styleLabel">Style</span>
+        <div class="segmented" role="group" aria-labelledby="styleLabel" data-setting="style">
+          <button type="button" data-value="chicago" aria-pressed="true">Chicago</button>
+          <button type="button" data-value="ap" aria-pressed="false">AP</button>
+        </div>
+      </div>
+
+      <div class="control">
+        <label class="control-label" for="formatSelect">Format</label>
+        <select class="select" id="formatSelect">
+          <option value="auto">Auto-detect</option>
+          <option value="markdown">Markdown</option>
+          <option value="html">HTML</option>
+          <option value="plain">Plain text</option>
+        </select>
+      </div>
+
+      <label class="switch" title="Keep acronyms like API, SEO, and NASA, and terms like JavaScript, correctly cased">
+        <input type="checkbox" id="acronymToggle" checked />
+        <span class="track" aria-hidden="true"></span>
+        Preserve acronyms
+      </label>
+
+      <label class="switch" title="Convert as you type">
+        <input type="checkbox" id="autoToggle" checked />
+        <span class="track" aria-hidden="true"></span>
+        Live convert
+      </label>
+
+      <div class="spacer"></div>
+
+      <button class="btn-primary" id="convertBtn" type="button">
+        <svg class="icon"><use href="#i-wand"/></svg>
+        Convert <span class="kbd">Ctrl ↵</span>
+      </button>
+    </section>
+
+    <!-- Input / output -->
+    <main class="panels">
+      <!-- Input panel -->
+      <section class="panel" aria-label="Input">
+        <div class="panel-head">
+          <div class="tabs" role="tablist" aria-label="Input mode">
+            <button type="button" role="tab" id="tabText" aria-selected="true" aria-controls="paneText">
+              <svg class="icon"><use href="#i-type"/></svg> Text
+            </button>
+            <button type="button" role="tab" id="tabFile" aria-selected="false" aria-controls="paneFile">
+              <svg class="icon"><use href="#i-upload"/></svg> Upload file
+            </button>
+          </div>
+          <div class="panel-actions">
+            <button class="btn-ghost" id="sampleBtn" type="button" title="Load sample text">
+              <svg class="icon"><use href="#i-sparkle"/></svg><span class="btn-label">Sample</span>
+            </button>
+            <button class="btn-ghost" id="clearBtn" type="button" title="Clear input">
+              <svg class="icon"><use href="#i-trash"/></svg><span class="btn-label">Clear</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-body" id="paneText" role="tabpanel" aria-labelledby="tabText">
+          <div class="editor">
+            <div class="gutter" id="gutter" aria-hidden="true">1</div>
+            <label for="input" class="sr-only">Text to convert</label>
+            <textarea class="input" id="input" spellcheck="false" wrap="off"
+              placeholder="Paste Markdown, HTML, or plain text here…&#10;&#10;# like this heading&#10;&lt;h2&gt;or this one&lt;/h2&gt;"></textarea>
+          </div>
+        </div>
+
+        <div class="panel-body" id="paneFile" role="tabpanel" aria-labelledby="tabFile" hidden>
+          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload a .txt, .md, or .html file">
+            <svg class="icon big-icon"><use href="#i-upload"/></svg>
+            <strong>Drop a file here, or click to browse</strong>
+            <span>.txt, .md, .markdown, .html, .htm (up to 5 MB)</span>
+            <span class="file-chip" id="fileChip">
+              <svg class="icon"><use href="#i-file"/></svg><span id="fileName"></span>
+            </span>
+            <input type="file" id="fileInput" accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html" hidden />
+          </div>
+        </div>
+
+        <div class="panel-foot">
+          <div class="stats">
+            <span class="chip"><b id="wordCount">0</b> words</span>
+            <span class="chip"><b id="charCount">0</b> characters</span>
+            <span class="chip"><b id="lineCount">1</b> lines</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Output panel -->
+      <section class="panel" aria-label="Output">
+        <div class="panel-head">
+          <div class="panel-title">
+            <svg class="icon"><use href="#i-check"/></svg> Result
+          </div>
+          <div class="panel-actions">
+            <button class="btn-ghost" id="highlightBtn" type="button" aria-pressed="true" title="Highlight changed words">
+              <svg class="icon"><use href="#i-eye"/></svg><span class="btn-label">Highlights</span>
+            </button>
+            <button class="btn-ghost" id="useBtn" type="button" title="Move the result into the input" disabled>
+              <svg class="icon"><use href="#i-swap"/></svg><span class="btn-label">Use as input</span>
+            </button>
+            <button class="btn-ghost" id="copyBtn" type="button" disabled>
+              <svg class="icon"><use href="#i-copy"/></svg><span class="btn-label">Copy</span>
+            </button>
+            <button class="btn-ghost" id="downloadBtn" type="button" disabled>
+              <svg class="icon"><use href="#i-download"/></svg><span class="btn-label">Download</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <pre class="output" id="output" aria-live="polite" tabindex="0"></pre>
+          <div class="empty-state" id="emptyState">
+            <svg class="icon big-icon"><use href="#i-wand"/></svg>
+            <div>Your title-cased text will appear here.</div>
+            <div style="font-size:13px">Paste something on the left, or try the sample.</div>
+          </div>
+        </div>
+
+        <div class="panel-foot">
+          <div class="stats" id="resultStats">
+            <span class="chip accent">Format: <b id="fmtStat">–</b></span>
+            <span class="chip"><b id="headingsStat">0</b> headings found</span>
+            <span class="chip"><b id="changedStat">0</b> changed</span>
+            <span class="chip"><b id="wordsStat">0</b> words recased</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      Runs entirely in your browser. Nothing you paste is uploaded. ·
+      <button type="button" id="rulesBtn">See the casing rules</button>
+    </footer>
+  </div>
+
+  <dialog class="rules" id="rulesDialog" aria-labelledby="rulesTitle">
+    <div class="rules-head">
+      <h2 id="rulesTitle">Casing rules</h2>
+      <button class="icon-btn" type="button" id="rulesClose" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="rules-body" id="rulesBody"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Title-casing engine -->
+  <script src="titlecase.js"></script>
+
+  <script>
+  (function () {
+    'use strict';
+
+    if (!window.TitleCase) {
+      document.body.innerHTML = '<p style="padding:24px;font-family:sans-serif">Could not load <code>titlecase.js</code>. Make sure it sits in the same folder as <code>index.html</code>.</p>';
+      return;
+    }
+
+    // ---------- Element references ----------
+    const $ = (id) => document.getElementById(id);
+    const input = $('input'), gutter = $('gutter'), output = $('output'), emptyState = $('emptyState');
+    const autoToggle = $('autoToggle'), acronymToggle = $('acronymToggle'), formatSelect = $('formatSelect');
+    const copyBtn = $('copyBtn'), downloadBtn = $('downloadBtn'), useBtn = $('useBtn'), highlightBtn = $('highlightBtn');
+    const dropzone = $('dropzone'), fileInput = $('fileInput');
+
+    // ---------- State ----------
+    const state = {
+      scope: 'headings',
+      style: 'chicago',
+      lastOutput: '',
+      lastFormat: 'plain',
+      fileName: null,      // name of the uploaded file, used for downloads
+      highlights: true
+    };
+
+    const SAMPLE = [
+      '# a beginner\'s guide to seo for shopify stores',
+      '',
+      'Search engine optimization is how people find your store. This paragraph stays as it is.',
+      '',
+      '## why page speed matters in 2026',
+      '',
+      '### the top-level checklist: what to fix first',
+      '',
+      '- compress images before upload',
+      '- use `lazy-loading` for anything below the fold',
+      '- read [the official guide to core web vitals](https://web.dev/vitals/)',
+      '',
+      '#### working with the REST API and json responses',
+      '',
+      '```js',
+      '// code blocks are never changed',
+      'const title = "keep this exactly as it is";',
+      '```',
+      '',
+      '##### an up-to-date look at headless commerce'
+    ].join('\n');
+
+    // ---------- Persisted preferences ----------
+    function loadPrefs() {
+      try {
+        const p = JSON.parse(localStorage.getItem('tcm-prefs') || '{}');
+        if (p.scope === 'all' || p.scope === 'headings') state.scope = p.scope;
+        if (p.style === 'ap' || p.style === 'chicago') state.style = p.style;
+        if (typeof p.acronyms === 'boolean') acronymToggle.checked = p.acronyms;
+        if (typeof p.live === 'boolean') autoToggle.checked = p.live;
+        if (typeof p.highlights === 'boolean') state.highlights = p.highlights;
+        if (['auto', 'markdown', 'html', 'plain'].includes(p.format)) formatSelect.value = p.format;
+      } catch (e) { /* storage unavailable: use defaults */ }
+    }
+    function savePrefs() {
+      try {
+        localStorage.setItem('tcm-prefs', JSON.stringify({
+          scope: state.scope, style: state.style, acronyms: acronymToggle.checked,
+          live: autoToggle.checked, highlights: state.highlights, format: formatSelect.value
+        }));
+      } catch (e) { /* ignore */ }
+    }
+
+    // ---------- Helpers ----------
+    function escapeHtml(s) {
+      return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+
+    /**
+     * Builds highlighted HTML for the output: words whose casing changed are wrapped
+     * in <mark>. Casing changes keep string length (almost always), so we compare
+     * character by character and expand each difference to its whole word.
+     */
+    function buildHighlighted(before, after) {
+      if (before.length !== after.length) return escapeHtml(after);
+      const isWordChar = (ch) => /[\p{L}\p{N}'’-]/u.test(ch);
+      const changed = new Uint8Array(after.length);
+      for (let i = 0; i < after.length; i++) {
+        if (before[i] !== after[i]) {
+          let s = i, e = i;
+          while (s > 0 && isWordChar(after[s - 1])) s--;
+          while (e < after.length - 1 && isWordChar(after[e + 1])) e++;
+          for (let k = s; k <= e; k++) changed[k] = 1;
+          i = e;
+        }
+      }
+      let html = '', open = false;
+      for (let i = 0; i < after.length; i++) {
+        if (changed[i] && !open) { html += '<mark>'; open = true; }
+        if (!changed[i] && open) { html += '</mark>'; open = false; }
+        html += escapeHtml(after[i]);
+      }
+      if (open) html += '</mark>';
+      return html;
+    }
+
+    function countWords(s) {
+      const m = s.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu);
+      return m ? m.length : 0;
+    }
+
+    function updateInputStats() {
+      const text = input.value;
+      const lines = text.split('\n').length;
+      $('wordCount').textContent = countWords(text).toLocaleString();
+      $('charCount').textContent = text.length.toLocaleString();
+      $('lineCount').textContent = lines.toLocaleString();
+      // Line-number gutter
+      let nums = '';
+      for (let i = 1; i <= lines; i++) nums += i + '\n';
+      gutter.textContent = nums;
+    }
+
+    let toastTimer;
+    function toast(msg, isError) {
+      const t = $('toast');
+      t.innerHTML = '<svg class="icon"><use href="#' + (isError ? 'i-x' : 'i-check') + '"/></svg>' + escapeHtml(msg);
+      t.classList.toggle('error', !!isError);
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    // ---------- Conversion ----------
+    function convert() {
+      const text = input.value;
+      const hasText = text.trim().length > 0;
+
+      emptyState.hidden = hasText;
+      [copyBtn, downloadBtn, useBtn].forEach((b) => (b.disabled = !hasText));
+
+      if (!hasText) {
+        output.textContent = '';
+        state.lastOutput = '';
+        $('fmtStat').textContent = '–';
+        $('headingsStat').textContent = '0';
+        $('changedStat').textContent = '0';
+        $('wordsStat').textContent = '0';
+        return;
+      }
+
+      const res = TitleCase.convert(text, {
+        scope: state.scope,
+        style: state.style,
+        preserveAcronyms: acronymToggle.checked,
+        format: formatSelect.value
+      });
+
+      state.lastOutput = res.output;
+      state.lastFormat = res.format;
+      output.innerHTML = buildHighlighted(text, res.output);
+      output.classList.toggle('no-marks', !state.highlights);
+
+      const fmtNames = { markdown: 'Markdown', html: 'HTML', plain: 'Plain text' };
+      $('fmtStat').textContent = fmtNames[res.format] || res.format;
+      $('headingsStat').textContent = res.stats.headingsFound.toLocaleString();
+      $('changedStat').textContent = res.stats.headingsChanged.toLocaleString();
+      $('wordsStat').textContent = res.stats.wordsChanged.toLocaleString();
+    }
+
+    let debounceTimer;
+    function scheduleConvert() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(convert, 150);
+    }
+
+    // ---------- Events: input ----------
+    input.addEventListener('input', () => {
+      updateInputStats();
+      if (autoToggle.checked) scheduleConvert();
+    });
+    input.addEventListener('scroll', () => { gutter.scrollTop = input.scrollTop; });
+    input.addEventListener('keydown', (e) => {
+      // Tab inserts two spaces instead of leaving the editor (Esc then Tab still moves focus)
+      if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const s = input.selectionStart, end = input.selectionEnd;
+        input.setRangeText('  ', s, end, 'end');
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); convert(); }
+    });
+
+    // ---------- Events: controls ----------
+    document.querySelectorAll('.segmented').forEach((group) => {
+      const key = group.dataset.setting;
+      group.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state[key] = btn.dataset.value;
+          group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+          savePrefs();
+          if (autoToggle.checked) convert();
+        });
+      });
+    });
+    function syncSegmented() {
+      document.querySelectorAll('.segmented').forEach((group) => {
+        const key = group.dataset.setting;
+        group.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === state[key])));
+      });
+    }
+
+    [acronymToggle, formatSelect].forEach((el) => el.addEventListener('change', () => {
+      savePrefs();
+      if (autoToggle.checked) convert();
+    }));
+    autoToggle.addEventListener('change', () => { savePrefs(); if (autoToggle.checked) convert(); });
+    $('convertBtn').addEventListener('click', convert);
+
+    // ---------- Events: input panel actions ----------
+    $('sampleBtn').addEventListener('click', () => {
+      showTab('text');
+      input.value = SAMPLE;
+      state.fileName = null;
+      updateInputStats();
+      convert();
+      input.focus();
+      input.setSelectionRange(0, 0);
+      input.scrollTop = 0; input.scrollLeft = 0; gutter.scrollTop = 0;
+    });
+    $('clearBtn').addEventListener('click', () => {
+      input.value = '';
+      state.fileName = null;
+      $('fileChip').classList.remove('show');
+      updateInputStats();
+      convert();
+      showTab('text');
+      input.focus();
+    });
+
+    // ---------- Tabs ----------
+    function showTab(which) {
+      const isText = which === 'text';
+      $('tabText').setAttribute('aria-selected', String(isText));
+      $('tabFile').setAttribute('aria-selected', String(!isText));
+      $('paneText').hidden = !isText;
+      $('paneFile').hidden = isText;
+    }
+    $('tabText').addEventListener('click', () => showTab('text'));
+    $('tabFile').addEventListener('click', () => showTab('file'));
+
+    // ---------- File upload ----------
+    const ALLOWED = /\.(txt|md|markdown|html?)$/i;
+    function readFile(file) {
+      if (!file) return;
+      if (!ALLOWED.test(file.name)) { toast('Please choose a .txt, .md, or .html file', true); return; }
+      if (file.size > 5 * 1024 * 1024) { toast('That file is over 5 MB', true); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        input.value = String(reader.result);
+        state.fileName = file.name;
+        $('fileName').textContent = file.name;
+        $('fileChip').classList.add('show');
+        updateInputStats();
+        convert();
+        showTab('text');
+        toast('Loaded ' + file.name);
+      };
+      reader.onerror = () => toast('Could not read that file', true);
+      reader.readAsText(file);
+    }
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener('change', () => { readFile(fileInput.files[0]); fileInput.value = ''; });
+
+    ['dragenter', 'dragover'].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+      e.preventDefault(); dropzone.classList.add('dragging');
+    }));
+    ['dragleave', 'drop'].forEach((ev) => dropzone.addEventListener(ev, (e) => {
+      e.preventDefault(); dropzone.classList.remove('dragging');
+    }));
+    dropzone.addEventListener('drop', (e) => readFile(e.dataTransfer.files[0]));
+
+    // Dropping a file anywhere on the page also works
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      if (e.target.closest && e.target.closest('#dropzone')) return;
+      e.preventDefault();
+      if (e.dataTransfer && e.dataTransfer.files.length) readFile(e.dataTransfer.files[0]);
+    });
+
+    // ---------- Output actions ----------
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(state.lastOutput);
+        toast('Copied to clipboard');
+      } catch (e) {
+        // Fallback for browsers that block the async clipboard API
+        const ta = document.createElement('textarea');
+        ta.value = state.lastOutput; document.body.appendChild(ta); ta.select();
+        const ok = document.execCommand('copy'); ta.remove();
+        toast(ok ? 'Copied to clipboard' : 'Copy failed. Select the text and copy manually', !ok);
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      const ext = { markdown: 'md', html: 'html', plain: 'txt' }[state.lastFormat] || 'txt';
+      const mime = { md: 'text/markdown', html: 'text/html', txt: 'text/plain' }[ext];
+      let name = 'title-case-output.' + ext;
+      if (state.fileName) {
+        const base = state.fileName.replace(/\.[^.]+$/, '');
+        const origExt = (state.fileName.match(/\.[^.]+$/) || ['.' + ext])[0];
+        name = base + '-title-case' + origExt;
+      }
+      const blob = new Blob([state.lastOutput], { type: mime + ';charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast('Downloaded ' + name);
+    });
+
+    useBtn.addEventListener('click', () => {
+      input.value = state.lastOutput;
+      updateInputStats();
+      convert();
+      toast('Result moved to input');
+    });
+
+    highlightBtn.addEventListener('click', () => {
+      state.highlights = !state.highlights;
+      highlightBtn.setAttribute('aria-pressed', String(state.highlights));
+      highlightBtn.style.opacity = state.highlights ? '1' : '.6';
+      output.classList.toggle('no-marks', !state.highlights);
+      savePrefs();
+    });
+
+    // ---------- Theme ----------
+    $('themeToggle').addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('tcm-theme', next); } catch (e) { /* ignore */ }
+    });
+
+    // ---------- Rules dialog (built from the engine's own word lists) ----------
+    function renderRules() {
+      const R = TitleCase.RULES;
+      const list = (arr) => arr.map((w) => '<code>' + escapeHtml(w) + '</code>').join(' ');
+      $('rulesBody').innerHTML =
+        '<h3>Always capitalized</h3><p>The first and last word, the first word after a colon or em dash, and every major word (nouns, verbs, adjectives, adverbs, pronouns).</p>' +
+        '<h3>Lowercase in Chicago style</h3><p>' + list(R.chicagoMinorWords) + '</p>' +
+        '<h3>Lowercase in AP style</h3><p>' + list(R.apMinorWords) + '<br>AP capitalizes every word of four or more letters.</p>' +
+        '<h3>Hyphenated words</h3><p><code>Self-Driving</code>, <code>Up-to-Date</code>, <code>Step-by-Step</code></p>' +
+        '<h3>Never changed</h3><p>Code blocks, inline code, HTML tags and attributes, URLs, email addresses, and mixed-case words such as <code>iPhone</code>.</p>' +
+        '<h3>Known terms (with “Preserve acronyms” on)</h3><p>' + list(R.knownTerms || []) + '</p>';
+    }
+    $('rulesBtn').addEventListener('click', () => { renderRules(); $('rulesDialog').showModal(); });
+    $('rulesClose').addEventListener('click', () => $('rulesDialog').close());
+    $('rulesDialog').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+    // ---------- Init ----------
+    loadPrefs();
+    syncSegmented();
+    highlightBtn.setAttribute('aria-pressed', String(state.highlights));
+    highlightBtn.style.opacity = state.highlights ? '1' : '.6';
+    updateInputStats();
+    convert();
+  })();
+  </script>
+</body>
+</html>
